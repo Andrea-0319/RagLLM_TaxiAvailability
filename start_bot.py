@@ -9,7 +9,7 @@ import os
 # Ensure the project root is in the path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from llm_tool.telegram_bot import main
+from llm_tool.telegram_bot import run_bot
 
 if __name__ == "__main__":
-    main()
+    run_bot()
