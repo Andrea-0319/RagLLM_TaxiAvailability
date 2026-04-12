@@ -21,6 +21,8 @@ OUTPUT_DIR = PROJECT_ROOT / "output"
 MODEL_ARTIFACTS_PATH = OUTPUT_DIR / "ml_model_artifacts_all_months.pkl"
 ZONE_DEFAULTS_PATH = OUTPUT_DIR / "zone_defaults.csv"
 YG_MODEL_PATH = OUTPUT_DIR / "yg_model_production.pkl"
+FHVHV_MODEL_PATH = OUTPUT_DIR / "fhvhv_model.pkl"
+FHVHV_THRESHOLDS_PATH = OUTPUT_DIR / "fhvhv_thresholds.pkl"
 ZONE_LOOKUP_URL = "https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv"
 
 # ─── Feature columns (must match training exactly) ───────────────────────
@@ -50,6 +52,18 @@ YG_CLASS_DESCRIPTIONS = {
     1: "la disponibilità dei taxi è intermedia in questa zona e fascia oraria",
     2: "trovare un taxi è generalmente facile in questa zona e fascia oraria",
 }
+# ─── FHVHV Model (Roberto) ───────────────────────────────────────────────
+FHVHV_MODEL_PATH = OUTPUT_DIR / "fhvhv_model.pkl"
+FHVHV_THRESHOLDS_PATH = OUTPUT_DIR / "fhvhv_thresholds.pkl"
+
+FHVHV_CLASS_NAMES = {0: "Facile", 1: "Medio", 2: "Difficile"}
+FHVHV_CLASS_EMOJIS = {0: "🟢", 1: "🟡", 2: "🔴"}
+FHVHV_CLASS_DESCRIPTIONS = {
+    0: "trovare un FHVHV è generalmente facile in questa zona e fascia oraria",
+    1: "la disponibilità degli FHVHV è intermedia in questa zona e fascia oraria",
+    2: "trovare un FHVHV è difficile in questa zona e fascia oraria",
+}
+
 VEHICLE_TYPE_DISPLAY = {
     "yellow":         "Taxi Giallo 🟡",
     "green_hail":     "Taxi Verde (Hail) 🟢",

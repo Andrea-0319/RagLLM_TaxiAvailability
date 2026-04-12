@@ -182,6 +182,26 @@ def mock_yg_predictor():
 
 
 @pytest.fixture
+def mock_fhvhv_predictor():
+    """Mock FHvhvPredictor that returns deterministic FHVHV results."""
+    with patch("llm_tool.agent.get_fhvhv_predictor") as mock:
+        fhvhv = MagicMock()
+        _fhvhv_result = {
+            "model_type": "fhvhv",
+            "location_id": 161,
+            "location_name": "Midtown Center",
+            "borough": "Manhattan",
+            "predicted_waiting_time": "05:30",
+            "predicted_class": 1,
+            "predicted_class_name": "Medio",
+            "predicted_class_description": "la disponibilità degli FHVHV è intermedia in questa zona e fascia oraria",
+        }
+        fhvhv.predict.return_value = _fhvhv_result
+        mock.return_value = fhvhv
+        yield fhvhv
+
+
+@pytest.fixture
 def validator():
     """Get InputValidator instance."""
     from llm_tool import get_validator

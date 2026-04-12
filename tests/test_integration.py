@@ -710,8 +710,8 @@ def test_chat_history_preserved(mock_llm_intent, mock_predictor, mock_validator,
 
 # ─── YG + FHVHV integration tests ────────────────────────────────────────────
 
-class TestYGIntegration:
-    """End-to-end tests through the full agent graph using mocked YGPredictor."""
+class TestVehicleTypeIntegration:
+    """End-to-end tests through the full agent graph using mocked predictors."""
 
     def test_yellow_taxi_prediction(self, mock_yg_predictor):
         """'taxi giallo a midtown alle 10' → predictor_node returns 1 YG result for yellow."""
@@ -764,8 +764,8 @@ class TestYGIntegration:
         assert "hail" in service_modes
         assert "dispatch" in service_modes
 
-    def test_fhvhv_returns_coming_soon(self):
-        """vehicle_type='fhvhv' → results contain coming_soon=True, no model call."""
+    def test_fhvhv_prediction_works(self, mock_fhvhv_predictor, mock_yg_predictor):
+        """vehicle_type='fhvhv' → predictor returns real prediction (no coming_soon)."""
         from llm_tool.agent import predictor_node
         from tests.conftest import create_state
         from langchain_core.messages import HumanMessage
@@ -778,8 +778,9 @@ class TestYGIntegration:
         )
         out = predictor_node(state)
         assert len(out["results"]) == 1
-        assert out["results"][0]["coming_soon"] is True
         assert out["results"][0]["model_type"] == "fhvhv"
+        assert "predicted_waiting_time" in out["results"][0]
+        assert "predicted_class" in out["results"][0]
 
     def test_formatter_renders_yg_multi(self, mock_yg_predictor):
         """_build_template handles 3 YG results without raising."""
@@ -812,6 +813,18 @@ class TestYGIntegration:
                     "location_name": "Midtown", "borough": "Manhattan"}]
         out = _build_template(results, {"hour": 10, "minute": 0, "day_of_week": 0, "month": 3})
         assert "FHVHV" in out or "coming soon" in out
+
+    def test_formatter_renders_fhvhv_real_prediction(self):
+        """_build_template renders real FHVHV prediction with waiting time."""
+        from llm_tool.agent import _build_template
+        results = [{"model_type": "fhvhv", "location_id": 161,
+                    "location_name": "Midtown Center", "borough": "Manhattan",
+                    "predicted_waiting_time": "05:30", "predicted_class": 1,
+                    "predicted_class_name": "Medio",
+                    "predicted_class_description": "la disponibilità degli FHVHV è intermedia"}]
+        out = _build_template(results, {"hour": 10, "minute": 0, "day_of_week": 0, "month": 3})
+        assert "05:30" in out
+        assert "Medio" in out
 
 
 class TestVehicleTypeSanitization:

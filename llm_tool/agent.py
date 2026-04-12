@@ -18,12 +18,14 @@ from langgraph.graph import StateGraph, END
 
 from .taxi_predictor import get_historical_trends, get_predictor
 from .yg_predictor import get_yg_predictor
+from .fhvhv_predictor import get_fhvhv_predictor
 from .input_validator import get_validator
 from .llm_factory import get_llm
 from .i18n import get_msg
 from .config import (
     CLASS_NAMES, CLASS_EMOJIS, DAY_NAMES_IT, MONTH_NAMES_IT,
     YG_CLASS_NAMES, YG_CLASS_EMOJIS, VEHICLE_TYPE_DISPLAY,
+    FHVHV_CLASS_EMOJIS,
 )
 from .prompts import _INTENT_PROMPT, _OOS_PROMPT, _INSIGHT_PROMPT
 
@@ -77,6 +79,24 @@ def _build_template(results: List[Dict], params: Dict) -> str:
         return "\n".join(lines)
 
     model_type = r0.get("model_type", "legacy")
+
+    if model_type == "fhvhv":
+        time_str = f"{eval_hour:02d}:{eval_minute:02d}"
+        lines.append(f"🕐 Ore {time_str}")
+        lines.append("")
+        
+        from .config import FHVHV_CLASS_EMOJIS, FHVHV_CLASS_DESCRIPTIONS
+        
+        wt = r0.get("predicted_waiting_time", "?:??")
+        cls = r0.get("predicted_class", 1)
+        emoji = FHVHV_CLASS_EMOJIS.get(cls, "❓")
+        cls_name = r0.get("predicted_class_name", "Medio")
+        
+        lines.append(f"🚗 *FHVHV (Uber/Lyft)*")
+        lines.append(f"   ⏱️ Tempo di attesa stimato: *{wt}*")
+        lines.append(f"   {emoji} *Disponibilità: {cls_name}*")
+        lines.append(f"   _{r0.get('predicted_class_description', '')}_")
+        return "\n".join(lines)
 
     if model_type == "yg":
         time_str = f"{eval_hour:02d}:{eval_minute:02d}"
@@ -285,12 +305,17 @@ def predictor_node(state: AgentState) -> Dict[str, Any]:
         hour_range   = state.get("hour_range", [])
 
         if vehicle_type == "fhvhv":
-            results = [{
-                "model_type":   "fhvhv",
-                "coming_soon":  True,
-                "message":      get_msg(lang, "fhvhv_coming_soon"),
-                "location_id":  location_id,
-            }]
+            fhvhv = get_fhvhv_predictor()
+            is_festivo = (eval_dow == 6)
+            result = fhvhv.predict(
+                location_id=location_id,
+                hour=eval_hour,
+                minute=eval_minute,
+                day_of_week=eval_dow,
+                month=eval_month,
+                is_festivo=is_festivo,
+            )
+            results = [result]
             return {"results": results, "next_step": "format"}
 
         yg = get_yg_predictor()

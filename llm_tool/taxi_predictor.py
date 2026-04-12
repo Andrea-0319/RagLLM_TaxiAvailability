@@ -448,7 +448,6 @@ def predict_fhvhv_availability(
 ) -> str:
     """
     Predict taxi availability for FHVHV vehicles (Uber, Lyft, rideshare) in a NYC zone.
-    NOTE: This model is not yet available — returns a coming-soon notice.
 
     Args:
         location_id:  NYC taxi zone ID (1-265).
@@ -458,8 +457,21 @@ def predict_fhvhv_availability(
         month:        Month (1-12).
         language:     Response language ("it" or "en").
     """
-    import json as _json
-    from .i18n import get_msg
-    msg = get_msg(language, "fhvhv_coming_soon")
-    return _json.dumps({"model": "fhvhv", "coming_soon": True, "message": msg}, ensure_ascii=False)
+    from .fhvhv_predictor import get_fhvhv_predictor
+    
+    try:
+        fhvhv = get_fhvhv_predictor()
+        is_festivo = (day_of_week == 6)
+        result = fhvhv.predict(
+            location_id=location_id,
+            hour=hour,
+            minute=minute,
+            day_of_week=day_of_week,
+            month=month,
+            is_festivo=is_festivo,
+        )
+        return json.dumps({"model": "fhvhv", **result}, ensure_ascii=False)
+    except Exception as e:
+        logger.error("[FHVHV tool] %s", e, exc_info=True)
+        raise ToolException(f"Errore FHVHV: {e}")
 
