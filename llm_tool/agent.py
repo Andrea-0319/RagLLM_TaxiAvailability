@@ -274,7 +274,7 @@ def predictor_node(state: AgentState) -> Dict[str, Any]:
     Node 5: Route to the correct predictor based on vehicle_type.
 
     Routing:
-      vehicle_type = "fhvhv"              → FHVHV coming-soon stub
+      vehicle_type = "fhvhv"              → FHVHVPredictor (fully implemented)
       vehicle_type = "all" | None         → YGPredictor.predict_all (3 results)
       vehicle_type = "yellow"             → YGPredictor.predict yellow-hail (1 result)
       vehicle_type = "green"              → YGPredictor.predict green-hail + green-dispatch (2 results)
