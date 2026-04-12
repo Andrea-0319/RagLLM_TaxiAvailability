@@ -20,6 +20,7 @@ OUTPUT_DIR = PROJECT_ROOT / "output"
 
 MODEL_ARTIFACTS_PATH = OUTPUT_DIR / "ml_model_artifacts_all_months.pkl"
 ZONE_DEFAULTS_PATH = OUTPUT_DIR / "zone_defaults.csv"
+YG_MODEL_PATH = OUTPUT_DIR / "yg_model_production.pkl"
 ZONE_LOOKUP_URL = "https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv"
 
 # ─── Feature columns (must match training exactly) ───────────────────────
@@ -40,6 +41,21 @@ CLASS_NAMES = {
 }
 
 CLASS_EMOJIS = {0: "🔴", 1: "🟠", 2: "🟡", 3: "🟢", 4: "🔵"}
+
+# ─── Yellow/Green Model (Riccardo) ──────────────────────────────────────
+YG_CLASS_NAMES = {0: "Bassa", 1: "Media", 2: "Alta"}
+YG_CLASS_EMOJIS = {0: "🔴", 1: "🟡", 2: "🟢"}
+YG_CLASS_DESCRIPTIONS = {
+    0: "trovare un taxi è difficile in questa zona e fascia oraria",
+    1: "la disponibilità dei taxi è intermedia in questa zona e fascia oraria",
+    2: "trovare un taxi è generalmente facile in questa zona e fascia oraria",
+}
+VEHICLE_TYPE_DISPLAY = {
+    "yellow":         "Taxi Giallo 🟡",
+    "green_hail":     "Taxi Verde (Hail) 🟢",
+    "green_dispatch": "Taxi Verde (Dispatch) 🟢",
+    "fhvhv":          "FHVHV (Uber/Lyft) 🚗",
+}
 
 # ─── Borough Encoding (from training data) ───────────────────────────────
 BOROUGH_ENCODING = {
