@@ -143,6 +143,45 @@ def mock_historical_trends():
 
 
 @pytest.fixture
+def mock_yg_predictor():
+    """Mock YGPredictor that returns deterministic YG results."""
+    with patch("llm_tool.agent.get_yg_predictor") as mock:
+        yg = MagicMock()
+        _yg_result = {
+            "model_type": "yg",
+            "location_id": 161,
+            "location_name": "Midtown Center",
+            "borough": "Manhattan",
+            "vehicle_type": "yellow",
+            "service_mode": "hail",
+            "predicted_class": 2,
+            "predicted_class_name": "Alta",
+            "availability_description": "trovare un taxi è generalmente facile in questa zona e fascia oraria",
+        }
+        yg.predict.return_value = _yg_result
+        yg.predict_all.return_value = [
+            _yg_result,
+            {**_yg_result, "vehicle_type": "green", "service_mode": "hail", "predicted_class": 0, "predicted_class_name": "Bassa"},
+            {**_yg_result, "vehicle_type": "green", "service_mode": "dispatch", "predicted_class": 1, "predicted_class_name": "Media"},
+        ]
+        
+        def predict_with_vehicle(location_id, hour, minute, day_of_week, month, vehicle_type, service_mode):
+            result = {**_yg_result, "vehicle_type": vehicle_type, "service_mode": service_mode}
+            if vehicle_type == "green":
+                if service_mode == "hail":
+                    result["predicted_class"] = 0
+                    result["predicted_class_name"] = "Bassa"
+                else:
+                    result["predicted_class"] = 1
+                    result["predicted_class_name"] = "Media"
+            return result
+        
+        yg.predict.side_effect = predict_with_vehicle
+        mock.return_value = yg
+        yield yg
+
+
+@pytest.fixture
 def validator():
     """Get InputValidator instance."""
     from llm_tool import get_validator

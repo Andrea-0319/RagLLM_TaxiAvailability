@@ -19,6 +19,7 @@ MESSAGES = {
         "invalid_hour": "Ora non valida (0-23)",
         "invalid_month": "Mese non valido (1-12)",
         "internal_error": "⚠️ Si è verificato un errore interno: {0}",
+        "fhvhv_coming_soon": "🚗 Il modello per i taxi FHVHV (Uber, Lyft, NCC) è in arrivo!\n\nPer ora posso predire la disponibilità di taxi gialli e verdi. Vuoi che controlli per te?",
     },
     "en": {
         "welcome": "🚕 *NYC Taxi Availability Bot (v2.2)*\n\nHi! I am ready for the presentation.\n\n_What I can do for you:_\n• Real-time predictions (also for time slots)\n• Historical trends analysis\n• Explanation of causes (Explainable AI)\n\nTry asking: _'How is the situation at JFK?'_",
@@ -36,6 +37,7 @@ MESSAGES = {
         "invalid_hour": "Invalid hour (0-23)",
         "invalid_month": "Invalid month (1-12)",
         "internal_error": "⚠️ An internal error occurred: {0}",
+        "fhvhv_coming_soon": "🚗 The FHVHV model (Uber, Lyft, rideshare) is coming soon!\n\nFor now I can predict availability for yellow and green taxis. Want me to check those for you?",
     }
 }
 

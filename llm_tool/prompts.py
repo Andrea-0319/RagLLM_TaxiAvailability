@@ -56,7 +56,13 @@ RULES:
 3. "day_of_week": 0-6. Compute "tomorrow"/"domani" relative to current day.
 4. "hour": 0-23. Compute relative ("in two hours"). Use null if not mentioned.
 5. "minute": 0-59. Default null if not mentioned.
+6. "vehicle_type": identify taxi type if mentioned:
+   - "yellow" for taxi giallo, yellow cab, yellow taxi
+   - "green"  for taxi verde, green cab, green taxi
+   - "fhvhv"  for Uber, Lyft, NCC, rideshare, FHVHV, app cab
+   - "all"    if not mentioned or user wants all types
+   Default: "all"
 
 Return ONLY valid JSON, no explanation:
-{{"zone": "<str|null>", "month": <int|null>, "day_of_week": <int|null>, "hour": <int|null>, "minute": <int|null>}}
+{{"zone": "<str|null>", "month": <int|null>, "day_of_week": <int|null>, "hour": <int|null>, "minute": <int|null>, "vehicle_type": "<yellow|green|fhvhv|all>"}}
 """

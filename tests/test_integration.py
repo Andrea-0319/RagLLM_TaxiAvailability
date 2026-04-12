@@ -708,6 +708,151 @@ def test_chat_history_preserved(mock_llm_intent, mock_predictor, mock_validator,
                     print("✗ FAIL: No response")
 
 
+# ─── YG + FHVHV integration tests ────────────────────────────────────────────
+
+class TestYGIntegration:
+    """End-to-end tests through the full agent graph using mocked YGPredictor."""
+
+    def test_yellow_taxi_prediction(self, mock_yg_predictor):
+        """'taxi giallo a midtown alle 10' → predictor_node returns 1 YG result for yellow."""
+        from llm_tool.agent import predictor_node
+        from tests.conftest import create_state
+        from langchain_core.messages import HumanMessage
+
+        state = create_state(
+            messages=[HumanMessage(content="taxi giallo a midtown alle 10")],
+            intent="predict",
+            params={"location_id": 161, "hour": 10, "minute": 0,
+                    "day_of_week": 0, "month": 3, "vehicle_type": "yellow"},
+        )
+        out = predictor_node(state)
+        assert out["next_step"] == "format"
+        assert len(out["results"]) == 1
+        assert out["results"][0]["vehicle_type"] == "yellow"
+        assert out["results"][0]["model_type"] == "yg"
+
+    def test_all_types_prediction(self, mock_yg_predictor):
+        """No vehicle_type specified → predictor_node calls predict_all → 3 results."""
+        from llm_tool.agent import predictor_node
+        from tests.conftest import create_state
+        from langchain_core.messages import HumanMessage
+
+        state = create_state(
+            messages=[HumanMessage(content="taxi a midtown alle 10")],
+            intent="predict",
+            params={"location_id": 161, "hour": 10, "minute": 0,
+                    "day_of_week": 0, "month": 3, "vehicle_type": "all"},
+        )
+        out = predictor_node(state)
+        assert len(out["results"]) == 3
+
+    def test_green_taxi_returns_two_modes(self, mock_yg_predictor):
+        """vehicle_type='green' → predictor_node returns hail + dispatch."""
+        from llm_tool.agent import predictor_node
+        from tests.conftest import create_state
+        from langchain_core.messages import HumanMessage
+
+        state = create_state(
+            messages=[HumanMessage(content="taxi verde a midtown")],
+            intent="predict",
+            params={"location_id": 161, "hour": 10, "minute": 0,
+                    "day_of_week": 0, "month": 3, "vehicle_type": "green"},
+        )
+        out = predictor_node(state)
+        assert len(out["results"]) == 2
+        service_modes = [r.get("service_mode") for r in out["results"]]
+        assert "hail" in service_modes
+        assert "dispatch" in service_modes
+
+    def test_fhvhv_returns_coming_soon(self):
+        """vehicle_type='fhvhv' → results contain coming_soon=True, no model call."""
+        from llm_tool.agent import predictor_node
+        from tests.conftest import create_state
+        from langchain_core.messages import HumanMessage
+
+        state = create_state(
+            messages=[HumanMessage(content="uber a midtown")],
+            intent="predict",
+            params={"location_id": 161, "hour": 10, "minute": 0,
+                    "day_of_week": 0, "month": 3, "vehicle_type": "fhvhv"},
+        )
+        out = predictor_node(state)
+        assert len(out["results"]) == 1
+        assert out["results"][0]["coming_soon"] is True
+        assert out["results"][0]["model_type"] == "fhvhv"
+
+    def test_formatter_renders_yg_multi(self, mock_yg_predictor):
+        """_build_template handles 3 YG results without raising."""
+        from llm_tool.agent import _build_template
+        results = [
+            {"model_type": "yg", "location_id": 161, "location_name": "Midtown Center",
+             "borough": "Manhattan", "vehicle_type": "yellow", "service_mode": "hail",
+             "predicted_class": 2, "predicted_class_name": "Alta",
+             "availability_description": "facile"},
+            {"model_type": "yg", "location_id": 161, "location_name": "Midtown Center",
+             "borough": "Manhattan", "vehicle_type": "green", "service_mode": "hail",
+             "predicted_class": 0, "predicted_class_name": "Bassa",
+             "availability_description": "difficile"},
+            {"model_type": "yg", "location_id": 161, "location_name": "Midtown Center",
+             "borough": "Manhattan", "vehicle_type": "green", "service_mode": "dispatch",
+             "predicted_class": 1, "predicted_class_name": "Media",
+             "availability_description": "intermedia"},
+        ]
+        out = _build_template(results, {"hour": 10, "minute": 0, "day_of_week": 0, "month": 3})
+        assert "Midtown Center" in out
+        assert "Alta" in out
+        assert "Bassa" in out
+        assert "Media" in out
+
+    def test_formatter_renders_fhvhv_coming_soon(self):
+        """_build_template renders FHVHV coming-soon message."""
+        from llm_tool.agent import _build_template
+        results = [{"model_type": "fhvhv", "coming_soon": True,
+                    "message": "🚗 FHVHV coming soon", "location_id": 161,
+                    "location_name": "Midtown", "borough": "Manhattan"}]
+        out = _build_template(results, {"hour": 10, "minute": 0, "day_of_week": 0, "month": 3})
+        assert "FHVHV" in out or "coming soon" in out
+
+
+class TestVehicleTypeSanitization:
+    """Test vehicle_type extraction and sanitization."""
+
+    def test_sanitize_yellow(self):
+        from llm_tool.input_validator import get_validator
+        v = get_validator()
+        r = v._sanitize_extracted({"zone": "midtown", "month": None, "day_of_week": None,
+                                   "hour": None, "minute": None, "vehicle_type": "yellow"})
+        assert r["vehicle_type"] == "yellow"
+
+    def test_sanitize_fhvhv(self):
+        from llm_tool.input_validator import get_validator
+        v = get_validator()
+        r = v._sanitize_extracted({"zone": None, "month": None, "day_of_week": None,
+                                   "hour": None, "minute": None, "vehicle_type": "fhvhv"})
+        assert r["vehicle_type"] == "fhvhv"
+
+    def test_sanitize_unknown_defaults_to_all(self):
+        from llm_tool.input_validator import get_validator
+        v = get_validator()
+        r = v._sanitize_extracted({"zone": None, "month": None, "day_of_week": None,
+                                   "hour": None, "minute": None, "vehicle_type": "bus"})
+        assert r["vehicle_type"] == "all"
+
+    def test_sanitize_missing_defaults_to_all(self):
+        from llm_tool.input_validator import get_validator
+        v = get_validator()
+        r = v._sanitize_extracted({"zone": None, "month": None, "day_of_week": None,
+                                   "hour": None, "minute": None})
+        assert r["vehicle_type"] == "all"
+
+    def test_fast_path_zone_id_sets_all(self):
+        """Regex fast-path (zona id 161) should include vehicle_type='all'."""
+        from llm_tool.input_validator import get_validator
+        v = get_validator()
+        r = v.extract("zona id 161")
+        assert r["vehicle_type"] == "all"
+
+
 # ─── Run All Tests ───────────────────────────────────────────────────────
 
 if __name__ == "__main__":

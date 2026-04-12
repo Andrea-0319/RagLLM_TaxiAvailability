@@ -300,6 +300,7 @@ def predict_taxi_availability(
     language: str = "en",
 ) -> str:
     """
+    [DEPRECATED — use predict_yellow_green_availability instead]
     Predict taxi availability for a NYC zone at a specific time.
     Includes insights (SHAP) explaining WHY the availability is what it is.
     """
@@ -372,4 +373,93 @@ def get_historical_trends(
     except Exception as e:
         logger.error(f"Trend error: {e}", exc_info=True)
         raise ToolException(f"Errore trend: {e}")
+
+
+@tool
+def predict_yellow_green_availability(
+    location_id: int,
+    hour: int,
+    minute: int,
+    day_of_week: int,
+    month: int,
+    vehicle_type: str = "all",
+    language: str = "it",
+) -> str:
+    """
+    Predict taxi availability for Yellow and/or Green taxis in a NYC zone.
+
+    Args:
+        location_id:  NYC taxi zone ID (1-265).
+        hour:         Hour of day (0-23).
+        minute:       Minute of hour (0-59).
+        day_of_week:  0=Monday ... 6=Sunday.
+        month:        Month (1-12).
+        vehicle_type: "yellow" | "green" | "all" (default: "all" — returns all three types).
+        language:     Response language ("it" or "en").
+    """
+    import json as _json
+    from langchain_core.tools.base import ToolException as _TE
+
+    errors = []
+    if not isinstance(location_id, int) or not (1 <= location_id <= 265):
+        errors.append("location_id must be an integer between 1 and 265")
+    if not isinstance(hour, int) or not (0 <= hour <= 23):
+        errors.append("hour must be between 0 and 23")
+    if not isinstance(minute, int) or not (0 <= minute <= 59):
+        errors.append("minute must be between 0 and 59")
+    if not isinstance(day_of_week, int) or not (0 <= day_of_week <= 6):
+        errors.append("day_of_week must be between 0 and 6")
+    if not isinstance(month, int) or not (1 <= month <= 12):
+        errors.append("month must be between 1 and 12")
+    if errors:
+        raise _TE("; ".join(errors))
+
+    try:
+        from .yg_predictor import get_yg_predictor
+        yg = get_yg_predictor()
+
+        if vehicle_type == "all" or vehicle_type is None:
+            results = yg.predict_all(location_id, hour, minute, day_of_week, month)
+        elif vehicle_type == "yellow":
+            results = [yg.predict(location_id, hour, minute, day_of_week, month, "yellow", "hail")]
+        elif vehicle_type == "green":
+            results = [
+                yg.predict(location_id, hour, minute, day_of_week, month, "green", "hail"),
+                yg.predict(location_id, hour, minute, day_of_week, month, "green", "dispatch"),
+            ]
+        else:
+            # Unknown type — fall back to all
+            results = yg.predict_all(location_id, hour, minute, day_of_week, month)
+
+        return _json.dumps({"model": "yg", "results": results}, ensure_ascii=False)
+    except Exception as e:
+        logger.error("[YG tool] %s", e, exc_info=True)
+        raise _TE(f"Errore YG: {e}")
+
+
+@tool
+def predict_fhvhv_availability(
+    location_id: int,
+    hour: int,
+    minute: int,
+    day_of_week: int,
+    month: int,
+    language: str = "it",
+) -> str:
+    """
+    Predict taxi availability for FHVHV vehicles (Uber, Lyft, rideshare) in a NYC zone.
+    NOTE: This model is not yet available — returns a coming-soon notice.
+
+    Args:
+        location_id:  NYC taxi zone ID (1-265).
+        hour:         Hour of day (0-23).
+        minute:       Minute of hour (0-59).
+        day_of_week:  0=Monday ... 6=Sunday.
+        month:        Month (1-12).
+        language:     Response language ("it" or "en").
+    """
+    import json as _json
+    from .i18n import get_msg
+    msg = get_msg(language, "fhvhv_coming_soon")
+    return _json.dumps({"model": "fhvhv", "coming_soon": True, "message": msg}, ensure_ascii=False)
 

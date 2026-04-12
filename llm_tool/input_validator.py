@@ -42,7 +42,7 @@ class InputValidator:
         if id_match:
             print(f"   [Validator] Fast-path: ID {id_match.group(1)}")
             return {"zone": id_match.group(1), "month": None, "day_of_week": None,
-                    "hour": None, "minute": None}
+                    "hour": None, "minute": None, "vehicle_type": "all"}
 
         print(f"   [Validator] LLM extraction...")
         raw = self._llm_extract(text)
@@ -101,7 +101,7 @@ class InputValidator:
         """
         sanitized: Dict[str, Any] = {
             "zone": None, "month": None, "day_of_week": None,
-            "hour": None, "minute": None,
+            "hour": None, "minute": None, "vehicle_type": "all",
         }
 
         # zone — mantieni come stringa, scarta valori null-like
@@ -144,6 +144,13 @@ class InputValidator:
                 sanitized["minute"] = m if 0 <= m <= 59 else None
             except (ValueError, TypeError):
                 pass
+
+        # vehicle_type — accept known values, default "all"
+        vt = raw.get("vehicle_type")
+        if vt and str(vt).strip().lower() in ("yellow", "green", "fhvhv", "all"):
+            sanitized["vehicle_type"] = str(vt).strip().lower()
+        else:
+            sanitized["vehicle_type"] = "all"
 
         return sanitized
 

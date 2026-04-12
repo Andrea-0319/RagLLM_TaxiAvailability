@@ -17,11 +17,13 @@ from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, System
 from langgraph.graph import StateGraph, END
 
 from .taxi_predictor import get_historical_trends, get_predictor
+from .yg_predictor import get_yg_predictor
 from .input_validator import get_validator
 from .llm_factory import get_llm
 from .i18n import get_msg
 from .config import (
     CLASS_NAMES, CLASS_EMOJIS, DAY_NAMES_IT, MONTH_NAMES_IT,
+    YG_CLASS_NAMES, YG_CLASS_EMOJIS, VEHICLE_TYPE_DISPLAY,
 )
 from .prompts import _INTENT_PROMPT, _OOS_PROMPT, _INSIGHT_PROMPT
 
@@ -51,30 +53,61 @@ def _build_template(results: List[Dict], params: Dict) -> str:
     if not results:
         return "⚠️ Nessun risultato disponibile."
 
-    now = datetime.now(ZoneInfo("America/New_York"))
-    eval_hour = params.get("hour") if params.get("hour") is not None else now.hour
+    now        = datetime.now(ZoneInfo("America/New_York"))
+    eval_hour   = params.get("hour")   if params.get("hour")   is not None else now.hour
     eval_minute = params.get("minute") if params.get("minute") is not None else 0
-    eval_dow = params.get("day_of_week") if params.get("day_of_week") is not None else now.weekday()
-    eval_month = params.get("month") if params.get("month") is not None else now.month
+    eval_dow    = params.get("day_of_week") if params.get("day_of_week") is not None else now.weekday()
+    eval_month  = params.get("month") if params.get("month") is not None else now.month
 
-    r0 = results[0]
+    r0        = results[0]
     zone_name = r0.get("location_name", "?")
     borough   = r0.get("borough", "")
     day_name  = DAY_NAMES_IT.get(eval_dow, "?")
     month_name = MONTH_NAMES_IT.get(eval_month, "?")
 
-    # reverse map: class_name → emoji
-    name_to_emoji = {v: CLASS_EMOJIS[k] for k, v in CLASS_NAMES.items()}
-
     lines = [f"🚕 *{zone_name}* ({borough})", f"📅 {day_name} — {month_name}", ""]
+
+    if r0.get("coming_soon"):
+        lines.append(r0.get("message", "🚗 FHVHV model coming soon."))
+        return "\n".join(lines)
 
     if "hourly_avg_availability" in r0:
         lines.append("📊 *Trend Storico:*")
         lines.append("I dati orari indicano l'indice di disponibilità medio da 0 (Bassa) a 1 (Alta).")
-    elif len(results) == 1:
-        cls  = r0["predicted_class"]
-        time_str = f"{eval_hour:02d}:{eval_minute:02d}"
+        return "\n".join(lines)
 
+    model_type = r0.get("model_type", "legacy")
+
+    if model_type == "yg":
+        time_str = f"{eval_hour:02d}:{eval_minute:02d}"
+        lines.append(f"🕐 Ore {time_str}")
+        lines.append("")
+
+        if len(results) == 1:
+            r    = results[0]
+            cls  = r["predicted_class"]
+            emoji = YG_CLASS_EMOJIS.get(cls, "❓")
+            vtype = VEHICLE_TYPE_DISPLAY.get(r["vehicle_type"], r["vehicle_type"])
+            lines.append(f"{emoji} *{vtype}*: {r['predicted_class_name']}")
+            lines.append(f"   _{r['availability_description']}_")
+        else:
+            lines.append("📊 *Disponibilità per tipo di taxi:*")
+            for r in results:
+                cls   = r["predicted_class"]
+                emoji  = YG_CLASS_EMOJIS.get(cls, "❓")
+                sm     = r.get("service_mode", "")
+                key    = f"{r['vehicle_type']}_{sm}" if sm else r["vehicle_type"]
+                vtype  = VEHICLE_TYPE_DISPLAY.get(key, r["vehicle_type"])
+                lines.append(f"  {emoji} *{vtype}*: {r['predicted_class_name']}")
+                lines.append(f"     _{r['availability_description']}_")
+
+        return "\n".join(lines)
+
+    name_to_emoji = {v: CLASS_EMOJIS[k] for k, v in CLASS_NAMES.items()}
+
+    if len(results) == 1:
+        cls      = r0["predicted_class"]
+        time_str = f"{eval_hour:02d}:{eval_minute:02d}"
         lines += [
             f"🕐 Ore {time_str}",
             f"{CLASS_EMOJIS.get(cls, '❓')} *{r0['predicted_class_name']}*"
@@ -156,7 +189,7 @@ def extractor_node(state: AgentState) -> Dict[str, Any]:
 
     # Multi-turn merge: start from carried params, override only explicit values
     merged = state.get("current_params", {}).copy()
-    for key in ("location_id", "month", "day_of_week", "hour", "minute"):
+    for key in ("location_id", "month", "day_of_week", "hour", "minute", "vehicle_type"):
         new_val = resolved.get(key)
         if new_val is not None:
             merged[key] = new_val
@@ -217,12 +250,20 @@ def guardrail_node(state: AgentState) -> Dict[str, Any]:
 
 
 def predictor_node(state: AgentState) -> Dict[str, Any]:
-    """Node 5: LightGBM predictions (single time-slot or hour range)."""
+    """
+    Node 5: Route to the correct predictor based on vehicle_type.
+
+    Routing:
+      vehicle_type = "fhvhv"              → FHVHV coming-soon stub
+      vehicle_type = "all" | None         → YGPredictor.predict_all (3 results)
+      vehicle_type = "yellow"             → YGPredictor.predict yellow-hail (1 result)
+      vehicle_type = "green"              → YGPredictor.predict green-hail + green-dispatch (2 results)
+    """
     print(f"--- [5. PREDICTOR] ---")
-    p         = state["current_params"]
-    intent    = state["intent"]
-    predictor = get_predictor()
-    results   = []
+    p          = state["current_params"]
+    intent     = state["intent"]
+    lang       = state.get("language", "it")
+    results    = []
 
     try:
         if intent == "trend":
@@ -231,27 +272,46 @@ def predictor_node(state: AgentState) -> Dict[str, Any]:
                 "day_of_week": p.get("day_of_week"),
             })
             results = [json.loads(trend_json)]
+            return {"results": results, "next_step": "format"}
+
+        now       = datetime.now(ZoneInfo("America/New_York"))
+        eval_hour   = p.get("hour")   if p.get("hour")   is not None else now.hour
+        eval_minute = p.get("minute") if p.get("minute") is not None else 0
+        eval_dow    = p.get("day_of_week") if p.get("day_of_week") is not None else now.weekday()
+        eval_month  = p.get("month") if p.get("month") is not None else now.month
+        location_id = p["location_id"]
+
+        vehicle_type = p.get("vehicle_type", "all") or "all"
+        hour_range   = state.get("hour_range", [])
+
+        if vehicle_type == "fhvhv":
+            results = [{
+                "model_type":   "fhvhv",
+                "coming_soon":  True,
+                "message":      get_msg(lang, "fhvhv_coming_soon"),
+                "location_id":  location_id,
+            }]
+            return {"results": results, "next_step": "format"}
+
+        yg = get_yg_predictor()
+
+        if hour_range:
+            for h in hour_range:
+                results.append(yg.predict(location_id, h, 0, eval_dow, eval_month, "yellow", "hail"))
+        elif vehicle_type == "all" or vehicle_type is None:
+            results = yg.predict_all(location_id, eval_hour, eval_minute, eval_dow, eval_month)
+        elif vehicle_type == "yellow":
+            results = [yg.predict(location_id, eval_hour, eval_minute, eval_dow, eval_month, "yellow", "hail")]
+        elif vehicle_type == "green":
+            results = [
+                yg.predict(location_id, eval_hour, eval_minute, eval_dow, eval_month, "green", "hail"),
+                yg.predict(location_id, eval_hour, eval_minute, eval_dow, eval_month, "green", "dispatch"),
+            ]
         else:
-            hour_range = state.get("hour_range", [])
-            lang = state.get("language", "it")
-            
-            now = datetime.now(ZoneInfo("America/New_York"))
-            eval_hour = p.get("hour") if p.get("hour") is not None else now.hour
-            eval_minute = p.get("minute") if p.get("minute") is not None else 0
-            eval_dow = p.get("day_of_week") if p.get("day_of_week") is not None else now.weekday()
-            eval_month = p.get("month") if p.get("month") is not None else now.month
-            
-            if hour_range:
-                for h in hour_range:
-                    results.append(predictor.predict(
-                        p["location_id"], h * 2,
-                        eval_dow, eval_month, language=lang))
-            else:
-                bucket = eval_hour * 2 + (1 if eval_minute >= 30 else 0)
-                results.append(predictor.predict(
-                    p["location_id"], bucket,
-                    eval_dow, eval_month, language=lang))
+            results = yg.predict_all(location_id, eval_hour, eval_minute, eval_dow, eval_month)
+
         return {"results": results, "next_step": "format"}
+
     except Exception as e:
         logger.error(f"[Predictor] {e}", exc_info=True)
         return {"validation_errors": [str(e)], "next_step": "format"}
