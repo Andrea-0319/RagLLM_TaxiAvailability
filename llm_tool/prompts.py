@@ -42,6 +42,8 @@ Rules:
 - No greetings. No bullet points. No markdown headers.
 - Respond in the SAME LANGUAGE as the user's message.
 - CRITICAL: ONLY use the data provided in the Data field. DO NOT invent, hallucinate, or output any information, statistics, or metrics not strictly supported by the provided Data.
+- If the data contains hourly trend information, you may use more than 3 sentences
+  to highlight peak hours, low hours, and one practical tip.
 """
 
 _EXTRACTION_SYSTEM_PROMPT = """\
