@@ -71,6 +71,11 @@ Esegue il modello LightGBM una o più volte:
 - **Singolo orario**: calcola il bucket 30-min e fa una predizione con confidenza.
 - **Fascia oraria** (es. _"pomeriggio"_): itera su tutte le ore della fascia e aggrega.
 - **Trend** (`intent=trend`): usa i dati storici aggregati (Tabular RAG).
+- **Vehicle type routing**:
+  - `vehicle_type = "fhvhv"` → FHvhvPredictor (Uber/Lyft)
+  - `vehicle_type = "all" | None` → YGPredictor.predict_all (3 risultati: yellow hail + green hail + dispatch)
+  - `vehicle_type = "yellow"` → YGPredictor.predict yellow hail (1 risultato)
+  - `vehicle_type = "green"` → YGPredictor.predict green hail + dispatch (2 risultati)
 
 ### 5. Formatter (`formatter_node`)
 Gestore ibrido della risposta finale:
@@ -81,6 +86,7 @@ Gestore ibrido della risposta finale:
 | Errori di validazione | Template deterministico con descrizione errore e suggerimento formato. |
 | Zona mancante / ambigua | Messaggio di clarification o lista bottoni disambiguation. |
 | Predizione riuscita | **Template deterministico** (emoji, dati strutturati) + **insight LLM** (2-3 frasi MAX, stesso lingua dell'utente). |
+| FHVHV (Uber/Lyft) | Template specifico con ⏱️ tempo di attesa stimato, emoji per classe (Facile/Medio/Difficile). |
 
 ---
 
@@ -90,6 +96,7 @@ Gestore ibrido della risposta finale:
 - **LLM fallback**: Ollama locale (`llama3.2:3b`) — nessuna API key necessaria.
 - **Factory LLM**: `llm_factory.py` → `get_llm()` centralizza la scelta del provider.
 - **ML Engine**: LightGBM + SHAP (predizioni + spiegabilità).
+- **FHVHV Model**: `Roberto` - LightGBM dedicato per Uber/Lyft (modello separato, file `fhvhv_model.pkl`).
 - **RAG**: Tabular RAG via CSV (Historical Trends per intent `trend`).
 - **Interface**: Python Telegram Bot (Inline Keyboards per disambiguation).
 - **In-Memory Caching (Nuovo)**: `cachetools` con `TTLCache` per le sessioni utente e limits (memory-leak safe).

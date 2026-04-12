@@ -436,6 +436,7 @@ Diagnosi: LEGGERO OVERFITTING - Marginale, accettabile
 ### Da Completare
 1. [ ] **Presentazione per Marcello**: slide sintetiche, no muri di testo, focus su insights e raccomandazioni pratiche
 2. [ ] **Aggiornamento SOTA**: benchmark con modelli piu' avanzati (CatBoost, Optuna, ensemble stacking) per Giovedi
+3. [x] **FHVHV Integration**: Implementato modello separato Uber/Lyft con routing nel chatbot tramite `vehicle_type`
 
 ### Ultime Evoluzioni (08 Aprile 2026)
 - **StateGraph Architecture**: Il bot ora segue un flusso logico rigido: Intent -> Context -> Extractor -> [Predictor] -> Formatter.
@@ -539,4 +540,75 @@ Tre problemi correlati con causa radice comune: intent classifier e formatter OO
 
 ---
 
-*Ultimo aggiornamento: 09 Aprile 2026 — MVP ready (Rate limits, TTLCache, i18n module).*
+## 15. FHVHV Integration — Uber/Lyft Availability (12 Aprile 2026)
+
+### Background
+Il chatbot originariamente supportava solo Yellow/Green taxi. Aggiunto supporto per FHVHV (Uber/Lyft) con modello separato.
+
+### Routing
+L'utente può specificare il tipo di veicolo:
+- `"Uber"` o `"Lyft"` → routing a `FHvhvPredictor`
+- `"taxi"` o nessuna menzione → routing a `YGPredictor` (default)
+
+L'implementazione è nel `predictor_node` di `agent.py`:
+```python
+if vehicle_type == "fhvhv":
+    fhvhv = get_fhvhv_predictor()
+    result = fhvhv.predict(location_id=..., hour=..., minute=..., ...)
+    return {"results": [result], "next_step": "format"}
+```
+
+### Modello FHVHV
+- **File**: `output/fhvhv_model.pkl`, `output/fhvhv_thresholds.pkl`
+- **Classe**: 3 classi (Facile, Medio, Difficile)
+- **Output**: `predicted_waiting_time` (mm:ss) invece di availability index
+
+---
+
+## 16. FHVHV Bug Fix — Categorical Feature Mismatch (12 Aprile 2026)
+
+### Problema
+Le predizioni FHVHV fallivano con errore `"train and valid dataset categorical_feature do not match"` per zone come JFK (132) o Times Square (230).
+
+### Root Cause
+**Due bug critici nel wrapper `fhvhv_predictor.py`**:
+
+| Bug | Problema | Impatzo |
+|-----|---------|----------|
+| Bug #1 | Feature `quarter` fantasma | Il codice di inferenza usava `quarter` che non esisteva nel modello di training di Roberto |
+| Bug #2 | `PULocationID` non castato a `category` | Il modello YG usa `_cast_categorical()` per creare categorie on-the-fly, FHVHV no |
+
+### Fix Applicate (`llm_tool/fhvhv_predictor.py`)
+
+1. **Rimossa feature `quarter`** dalla lista `_FHVHV_FEATURES`:
+   ```python
+   _FHVHV_FEATURES = [
+       "PULocationID",
+       "hour_sin", "hour_cos",
+       "minute_sin", "minute_cos",
+       "dow_sin", "dow_cos",
+       "month",
+       "is_festivo",
+   ]
+   ```
+
+2. **Rimosso calcolo `quarter`** da `_build_fhvhv_features()`
+
+3. **Aggiunto cast a `category`** per `PULocationID`:
+   ```python
+   X = pd.DataFrame([feats])[_FHVHV_FEATURES]
+   X["PULocationID"] = X["PULocationID"].astype("category")
+   ```
+
+### Test
+- 15 test unitari passano (`pytest tests/test_fhvhv_predictor.py -v`)
+- Rimosso `test_build_features_quarter` che testava feature rimossa
+
+### Commit
+```
+5582e4f fix: remove quarter feature, add PULocationID category cast in FHVHV predictor
+```
+
+---
+
+*Ultimo aggiornamento: 12 Aprile 2026 — FHVHV bug fix (quarter + category cast)*
