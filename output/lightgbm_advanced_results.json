@@ -1,0 +1,17 @@
+{
+  "model": "LightGBM",
+  "dataset": "all_months_2025",
+  "cv_f1_macro": 0.8725,
+  "test_accuracy": 0.831,
+  "test_f1_macro": 0.7307,
+  "test_f1_weighted": 0.833,
+  "test_precision": 0.7076,
+  "test_recall": 0.7666,
+  "best_params": {
+    "learning_rate": "0.15",
+    "n_estimators": "400",
+    "num_leaves": "255"
+  },
+  "train_time_seconds": 97.2,
+  "learning_curve_diagnosis": "LEGGERO OVERFITTING - Marginale, accettabile"
+}

@@ -1,0 +1,60 @@
+# Environment files to ignore
+.env
+.env.local
+*.env
+.claude
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Large binary model files (tracked locally, excluded from remote)
+output/best_model.pkl
+output/best_model_all_months.pkl
+output/ml_model_artifacts.pkl
+output/ml_model_artifacts_all_months.pkl
+
+# Raw dataset files (too large for git - use DVC or direct download)
+data/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

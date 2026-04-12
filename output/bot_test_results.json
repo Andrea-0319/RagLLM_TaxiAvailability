@@ -1,0 +1,30 @@
+{
+  "direct_predict": [
+    {
+      "description": "Midtown, Lunedì 8:00 Marzo",
+      "response": "📍 *Midtown Center* (Manhattan)\n🗓️ Lunedi, Marzo — ore 08:00-08:30\n\n🔴 *Disponibilità: Molto Difficile*\n📊 Confidenza: 95.3%\n\n_Distribuzione probabilità:_\n  Molto Difficile: `█████████░` 95.3%\n  Difficile: `░░░░░░░░░░` 3.8%\n  Medio: `░░░░░░░░░░` 0.3%\n  Facile: `░░░░░░░░░░` 0.5%\n  Molto Facile: `░░░░░░░░░░` 0.1%"
+    },
+    {
+      "description": "JFK, Saturday 10pm July",
+      "response": "📍 *JFK Airport* (Queens)\n🗓️ Saturday, July — 22:00-22:30\n\n🟢 *Availability: Easy*\n📊 Confidence: 59.5%\n\n_Probability distribution:_\n  Very Difficult: `░░░░░░░░░░` 0.1%\n  Difficult: `░░░░░░░░░░` 0.7%\n  Medium: `█░░░░░░░░░` 11.2%\n  Easy: `█████░░░░░` 59.5%\n  Very Easy: `██░░░░░░░░` 28.5%"
+    },
+    {
+      "description": "Brooklyn, Venerdì 17:30 Gen",
+      "response": "📍 *East Flatbush/Farragut* (Brooklyn)\n🗓️ Venerdi, Gennaio — ore 17:30-17:59\n\n🟢 *Disponibilità: Facile*\n📊 Confidenza: 94.6%\n\n_Distribuzione probabilità:_\n  Molto Difficile: `░░░░░░░░░░` 0.0%\n  Difficile: `░░░░░░░░░░` 0.1%\n  Medio: `░░░░░░░░░░` 2.8%\n  Facile: `█████████░` 94.6%\n  Molto Facile: `░░░░░░░░░░` 2.5%"
+    }
+  ],
+  "agent_chat": [
+    {
+      "query": "Quanti taxi ci sono a Midtown il lunedì alle 8 di mattina a marzo?",
+      "response": "⚠️ Si è verificato un errore. Prova a riformulare la domanda o riprova più tardi.\n(Error: llama runner process has terminated: %!w(<nil>) (status code: 500))"
+    },
+    {
+      "query": "How easy to find a taxi at Times Square Saturday 10pm in July?",
+      "response": "⚠️ Si è verificato un errore. Prova a riformulare la domanda o riprova più tardi.\n(Error: llama runner process has terminated: %!w(<nil>) (status code: 500))"
+    },
+    {
+      "query": "Brooklyn venerdì sera a gennaio, difficile trovare un taxi?",
+      "response": "⚠️ Si è verificato un errore. Prova a riformulare la domanda o riprova più tardi.\n(Error: llama runner process has terminated: %!w(<nil>) (status code: 500))"
+    }
+  ]
+}
