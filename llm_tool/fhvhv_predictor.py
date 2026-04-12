@@ -34,10 +34,11 @@ US_HOLIDAYS = [
 ]
 
 _FHVHV_FEATURES = [
-    "PULocationID", "month", "quarter",
+    "PULocationID",
     "hour_sin", "hour_cos",
     "minute_sin", "minute_cos",
     "dow_sin", "dow_cos",
+    "month",
     "is_festivo",
 ]
 
@@ -51,7 +52,6 @@ def _build_fhvhv_features(
     is_festivo: bool,
 ) -> Dict[str, Any]:
     """Compute the features expected by the FHVHV model."""
-    quarter = minute // 15
     hour_sin = float(np.sin(2 * np.pi * hour / 24))
     hour_cos = float(np.cos(2 * np.pi * hour / 24))
     minute_sin = float(np.sin(2 * np.pi * minute / 60))
@@ -61,14 +61,13 @@ def _build_fhvhv_features(
 
     return {
         "PULocationID": int(location_id),
-        "month": int(month),
-        "quarter": int(quarter),
         "hour_sin": hour_sin,
         "hour_cos": hour_cos,
         "minute_sin": minute_sin,
         "minute_cos": minute_cos,
         "dow_sin": dow_sin,
         "dow_cos": dow_cos,
+        "month": int(month),
         "is_festivo": int(is_festivo),
     }
 
@@ -151,6 +150,7 @@ class FHvhvPredictor:
             is_festivo=is_festivo,
         )
         X = pd.DataFrame([feats])[_FHVHV_FEATURES]
+        X["PULocationID"] = X["PULocationID"].astype("category")
 
         waiting_time = float(self._model.predict(X)[0])
         waiting_time = max(0.0, waiting_time)

@@ -35,15 +35,6 @@ def test_build_features_minute_encoding():
     assert abs(feats30["minute_cos"] - (-1.0)) < 1e-4  # cos(π) = -1
 
 
-def test_build_features_quarter():
-    """minute=0 → quarter=0, minute=15 → quarter=1, minute=45 → quarter=3."""
-    from llm_tool.fhvhv_predictor import _build_fhvhv_features
-    assert _build_fhvhv_features(161, 10, 0, 0, 1, False)["quarter"] == 0
-    assert _build_fhvhv_features(161, 10, 15, 0, 1, False)["quarter"] == 1
-    assert _build_fhvhv_features(161, 10, 30, 0, 1, False)["quarter"] == 2
-    assert _build_fhvhv_features(161, 10, 45, 0, 1, False)["quarter"] == 3
-
-
 def test_build_features_dow_encoding():
     """dow_sin and dow_cos are correct for day_of_week=0 and day_of_week=3."""
     from llm_tool.fhvhv_predictor import _build_fhvhv_features
