@@ -1,5 +1,6 @@
 import sys, os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+sys.path.insert(0, PROJECT_ROOT)
 
 import streamlit as st
 import json
@@ -8,6 +9,10 @@ import pandas as pd
 from langchain_core.messages import HumanMessage, AIMessage
 
 from llm_tool.agent import get_agent
+
+riccardo_path = os.path.join(PROJECT_ROOT, "riccardo")
+if riccardo_path not in sys.path:
+    sys.path.insert(0, riccardo_path)
 from riccardo.Prediction_model_taxi import predict_taxi_availability
 from riccardo.Usable import mapping
 

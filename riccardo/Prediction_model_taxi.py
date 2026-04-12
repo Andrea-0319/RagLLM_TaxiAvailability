@@ -1,10 +1,11 @@
 import joblib
 import pandas as pd
 import numpy as np
+import os
 
-
-MODEL_PATH = "taxi_lgbm_model_production.pkl"
-FEATURE_IMPORTANCE_PATH = "feature_importance_production.csv"
+MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(MODEL_DIR, "taxi_lgbm_model_production.pkl")
+FEATURE_IMPORTANCE_PATH = os.path.join(MODEL_DIR, "feature_importance_production.csv")
 
 FEATURES = [
     "zone",
