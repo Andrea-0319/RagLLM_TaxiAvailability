@@ -2,6 +2,15 @@
 import numpy as np
 import pytest
 from unittest.mock import MagicMock, patch
+import pandas as pd
+
+
+# ─── Zone lookup helper (used by fixtures and standalone tests) ───────────────
+
+def _fake_zone_lookup():
+    return pd.DataFrame([
+        {"LocationID": 161, "Borough": "Manhattan", "Zone": "Midtown Center", "service_zone": "Yellow Zone"},
+    ])
 
 
 # ─── Feature engineering helpers ─────────────────────────────────────────────
@@ -71,19 +80,17 @@ def yg_predictor_loaded(mock_yg_model):
          patch("llm_tool.yg_predictor._load_zone_lookup") as mock_lookup:
         mock_lookup.return_value = _fake_zone_lookup()
         from llm_tool.yg_predictor import YGPredictor
-        # Reset singleton state for test isolation
+        # Reset ALL singleton state for test isolation
         YGPredictor._instance = None
+        YGPredictor._model = None
+        YGPredictor._zone_lookup = None
         p = YGPredictor()
         p.load()
         yield p
+        # Teardown: reset all singleton state
         YGPredictor._instance = None
-
-
-def _fake_zone_lookup():
-    import pandas as pd
-    return pd.DataFrame([
-        {"LocationID": 161, "Borough": "Manhattan", "Zone": "Midtown Center", "service_zone": "Yellow Zone"},
-    ])
+        YGPredictor._model = None
+        YGPredictor._zone_lookup = None
 
 
 def test_predict_returns_normalised_schema(yg_predictor_loaded):
@@ -108,15 +115,15 @@ def test_predict_returns_normalised_schema(yg_predictor_loaded):
 
 
 def test_predict_all_returns_three_results(yg_predictor_loaded):
-    """predict_all() returns exactly 3 results: yellow-hail, green-hail, green-dispatch."""
+    """predict_all() returns exactly 3 results in correct order: yellow-hail, green-hail, green-dispatch."""
     results = yg_predictor_loaded.predict_all(
         location_id=161, hour=10, minute=30, day_of_week=0, month=3
     )
     assert len(results) == 3
-    types = [(r["vehicle_type"], r["service_mode"]) for r in results]
-    assert ("yellow", "hail")    in types
-    assert ("green",  "hail")    in types
-    assert ("green",  "dispatch") in types
+    # Assert exact order (spec requires this ordering)
+    assert results[0]["vehicle_type"] == "yellow" and results[0]["service_mode"] == "hail"
+    assert results[1]["vehicle_type"] == "green"  and results[1]["service_mode"] == "hail"
+    assert results[2]["vehicle_type"] == "green"  and results[2]["service_mode"] == "dispatch"
 
 
 def test_predict_class_out_of_range_falls_back(mock_yg_model):
@@ -127,19 +134,43 @@ def test_predict_class_out_of_range_falls_back(mock_yg_model):
         mock_lookup.return_value = _fake_zone_lookup()
         from llm_tool.yg_predictor import YGPredictor
         YGPredictor._instance = None
+        YGPredictor._model = None
+        YGPredictor._zone_lookup = None
         p = YGPredictor()
         p.load()
         result = p.predict(161, 10, 0, 0, 1, "yellow", "hail")
         assert result["predicted_class"] == 1
         assert result["predicted_class_name"] == "Media"
         YGPredictor._instance = None
+        YGPredictor._model = None
+        YGPredictor._zone_lookup = None
+
+
+def test_predict_unknown_location_returns_unknown(yg_predictor_loaded):
+    """location_id not in zone lookup returns 'Unknown' for location_name and borough."""
+    result = yg_predictor_loaded.predict(
+        location_id=999, hour=10, minute=0,
+        day_of_week=0, month=3,
+        vehicle_type="yellow", service_mode="hail"
+    )
+    assert result["location_name"] == "Unknown"
+    assert result["borough"] == "Unknown"
 
 
 def test_get_yg_predictor_returns_singleton():
     """get_yg_predictor() always returns the same instance."""
+    import llm_tool.yg_predictor as yg_mod
     from llm_tool.yg_predictor import get_yg_predictor, YGPredictor
+    # Reset all singleton state
+    yg_mod._yg_predictor = None
     YGPredictor._instance = None
+    YGPredictor._model = None
+    YGPredictor._zone_lookup = None
     p1 = get_yg_predictor()
     p2 = get_yg_predictor()
     assert p1 is p2
+    # Teardown
+    yg_mod._yg_predictor = None
     YGPredictor._instance = None
+    YGPredictor._model = None
+    YGPredictor._zone_lookup = None
