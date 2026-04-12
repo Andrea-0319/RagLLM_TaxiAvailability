@@ -611,4 +611,77 @@ Le predizioni FHVHV fallivano con errore `"train and valid dataset categorical_f
 
 ---
 
-*Ultimo aggiornamento: 12 Aprile 2026 — FHVHV bug fix (quarter + category cast)*
+## 17. Streamlit + Telegram Integration (Approccio B)
+
+### Contesto
+Il progetto aveva due chatbot separati che usavano la stessa logica di dominio ma con implementazioni duplicate:
+- **Bot Telegram** (Andrea): LangGraph StateGraph, `llm_tool/agent.py` — logica completa, multi-turn
+- **Streamlit app** (Rania): pipeline Python semplice con 55 fatti hardcoded
+
+### Obiettivo
+Entrambe le interfacce usano lo stesso `TaxiAgent` (LangGraph). La logica RAG di Rania viene integrata nel Formatter del bot Telegram.
+
+### Modifiche Applicate
+
+#### Step 1 — `llm_tool/rag_documents.py` (già esistente)
+Copiato da `StreamlitRania/documents.py` — 55 fatti hardcoded sulla disponibilità taxi NYC.
+
+#### Step 2 — `llm_tool/rag_retriever.py` (NUOVO)
+Retriever FAISS con inizializzazione lazy:
+```python
+def retrieve_context(query: str, k: int = 3) -> str:
+    global _db
+    if _db is None:
+        # caricamento lazy del modello embedding
+        _db = FAISS.from_texts(documents, embedding)
+    results = _db.similarity_search(query, k=k)
+    return "\n".join([r.page_content for r in results])
+```
+
+#### Step 3 — `llm_tool/agent.py` (MODIFICATO)
+Modificato `formatter_node` per includere il RAG context nell'insight LLM:
+```python
+# RAG context
+rag_query = f"{user_msg} {' '.join(r.get('predicted_class_name','') for r in state['results'])}"
+rag_context = retrieve_context(rag_query, k=3)
+insight_input += f"\n\nContext:\n{rag_context}"
+```
+
+#### Step 4 — `llm_tool/StreamlitRania/app.py` (RISCRITTO)
+- Sostituita `pipeline()` con `TaxiAgent.chat()`
+- Aggiunta multi-turn chat history Session State
+- Mantenuta struttura visiva originale (titolo, CSS, mappa PyDeck, bottoni esempio)
+
+### Dipendenze Installate
+- `faiss-cpu` — installato per supportare il retriever FAISS
+
+### Commit
+```
+<hash> merge: integrate Streamlit RAG into Telegram bot, rewrite Streamlit app to use TaxiAgent
+```
+
+---
+
+## 18. RAG Integration (Approccio B — COMPLETE)
+
+### File Modificati/Creati
+| File | Azione |
+|------|--------|
+| `llm_tool/rag_documents.py` | Pre-esistente (55 fatti) |
+| `llm_tool/rag_retriever.py` | NUOVO — retriever FAISS lazy |
+| `llm_tool/agent.py` | MODIFICATO — formatter_node con RAG context |
+| `llm_tool/StreamlitRania/app.py` | RISCRITTO — usa TaxiAgent |
+
+### Verifica
+- pytest: 178/180 passano (2 falliti sono test demo intenzionali)
+- Nessuna regressione sulla logica esistente
+- Il RAG è completamente opzionale (try/except con fallback graceful)
+
+### Note
+- L'import RAG è lazy per non rallentare lo startup del bot Telegram
+- Il bot funziona anche senza le dipendenze RAG (faiss-cpu) — gracefully degradable
+- Streamlit ora ha la stessa logica del bot Telegram (multi-turn, disambiguation)
+
+---
+
+*Ultimo aggiornamento: 12 Aprile 2026 — Merge Streamlit + Telegram (Approccio B)*

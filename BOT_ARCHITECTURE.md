@@ -85,7 +85,7 @@ Gestore ibrido della risposta finale:
 | `intent = oos` | Chiama l'LLM con `_OOS_PROMPT` + conversation history. Risposta conversazionale contestuale, max 2-3 frasi. Fallback su stringa predefinita se l'LLM fallisce. |
 | Errori di validazione | Template deterministico con descrizione errore e suggerimento formato. |
 | Zona mancante / ambigua | Messaggio di clarification o lista bottoni disambiguation. |
-| Predizione riuscita | **Template deterministico** (emoji, dati strutturati) + **insight LLM** (2-3 frasi MAX, stesso lingua dell'utente). |
+| Predizione riuscita | **Template deterministico** (emoji, dati strutturati) + **insight LLM** arricchito con **RAG context** (2-3 frasi MAX, stesso lingua dell'utente). |
 | FHVHV (Uber/Lyft) | Template specifico con ⏱️ tempo di attesa stimato, emoji per classe (Facile/Medio/Difficile). |
 
 ---
@@ -97,7 +97,7 @@ Gestore ibrido della risposta finale:
 - **Factory LLM**: `llm_factory.py` → `get_llm()` centralizza la scelta del provider.
 - **ML Engine**: LightGBM + SHAP (predizioni + spiegabilità).
 - **FHVHV Model**: `Roberto` - LightGBM dedicato per Uber/Lyft (modello separato, file `fhvhv_model.pkl`).
-- **RAG**: Tabular RAG via CSV (Historical Trends per intent `trend`).
+- **RAG**: Due sistemi: (1) Tabular RAG via CSV per Historical Trends (intent `trend`), (2) Semantic RAG con FAISS per arricchire gli insight LLM nel Formatter.
 - **Interface**: Python Telegram Bot (Inline Keyboards per disambiguation).
 - **In-Memory Caching (Nuovo)**: `cachetools` con `TTLCache` per le sessioni utente e limits (memory-leak safe).
 

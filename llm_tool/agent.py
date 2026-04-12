@@ -393,9 +393,21 @@ def formatter_node(state: AgentState) -> Dict[str, Any]:
     # ── LLM insight (2-3 sentences only) ─────────────────────────────────────
     try:
         user_msg = state["messages"][-1].content
+
+        # ── RAG context ─────────────────────────────────────────────────
+        rag_context = ""
+        try:
+            from .rag_retriever import retrieve_context
+            rag_query = f"{user_msg} {' '.join(r.get('predicted_class_name','') for r in state['results'])}"
+            rag_context = retrieve_context(rag_query, k=3)
+        except Exception as e:
+            logger.warning(f"[Formatter] RAG retrieval failed: {e}")
+
         llm = get_llm(temperature=0.0)
         insight_input = (f'User asked: "{user_msg}"\n\n'
                          f"Data: {json.dumps(state['results'], ensure_ascii=False)}")
+        if rag_context:
+            insight_input += f"\n\nContext:\n{rag_context}"
         resp = llm.invoke([SystemMessage(content=_INSIGHT_PROMPT),
                            HumanMessage(content=insight_input)])
         final = f"{template}\n\n💡 *Insight:* {resp.content.strip()}"
