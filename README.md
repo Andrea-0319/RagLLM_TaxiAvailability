@@ -1,6 +1,6 @@
 # NYC Taxi Availability Prediction Bot
 
-Un chatbot Telegram che prevede la disponibilità dei taxi a New York City, integrando modelli ML di Roberto e un modello Riccardo per le previsioni Yellow/Green taxi.
+Un chatbot Telegram che prevede la disponibilità dei taxi a New York City, integrando modelli ML di Roberto e Riccardo per le previsioni Yellow/Green taxi e FHVHV.
 
 ---
 
@@ -10,7 +10,7 @@ Un chatbot Telegram che prevede la disponibilità dei taxi a New York City, inte
 |------------|-------------|
 | **Interfaccia** | Bot Telegram con supporto multi-lingua (IT/EN) |
 | **Orchestrazione** | LangGraph StateGraph (Intent → Context → Extractor → Guardrail → Predictor → Formatter) |
-| **ML Engine** | LightGBM con modelli per taxi tradizionali (Roberto) e rideshare Uber/Lyft |
+| **ML Engine** | LightGBM con modelli per taxi tradizionali e rideshare Uber/Lyft |
 | **RAG** | FAISS-based retriever per insight contestuali |
 
 ---
@@ -41,7 +41,7 @@ Utente → Intent Classifier (LLM)
 
 ### Gestione Tipi di Veicolo
 
-- **Yellow/Green Taxi**: usa il modello di Roberto (`yg_predictor.py`)
+- **Yellow/Green Taxi**: usa il modello di Riccardo (`yg_predictor.py`)
 - **Uber/Lyft (FHVHV)**: usa il modello di Roberto per rideshare (`fhvhv_predictor.py`)
 - **Default**: mostra tutti i tipi disponibili
 
@@ -49,7 +49,7 @@ Utente → Intent Classifier (LLM)
 
 ## Modelli ML
 
-### Modello Roberto (Yellow/Green Taxi)
+### Modello Riccardo (Yellow/Green Taxi)
 
 **File**: `roberto/waiting_time_lgbm.pkl`
 
@@ -187,8 +187,8 @@ Vedi `requirements.txt`. Principali:
 
 ## Crediti
 
-- **Chatbot**: Andrea (LangGraph, orchestrazione, integrazione)
-- **Modello Yellow/Green**: Roberto (LightGBM training, feature engineering)
+- **Chatbot**: Andrea Scalora (LangGraph, orchestrazione, integrazione, chatbot Telegram)
+- **Pulizia Dataset**: Diego Valle (feature engineering)
+- **Modello Yellow/Green**: Riccardo (Taxi giallo/verde availability prediction)
 - **Modello FHVHV**: Roberto (Uber/Lyft availability prediction)
-- **Modello legacy**: Riccardo (confronto e retrocompatibilità)
-- **Streamlit**: Rania (interfaccia web, mappa PyDeck)
+- **Streamlit**: Rania (interfaccia web Streamlit, mappa PyDeck)
