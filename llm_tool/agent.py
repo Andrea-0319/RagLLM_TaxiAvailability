@@ -44,13 +44,14 @@ class AgentState(TypedDict):
     results:           List[Dict[str, Any]]  # predictor output
     validation_errors: List[str]             # guardrail feedback
     hour_range:        List[int]             # hours for range predictions
+    hour_range_label:  str                    # "Pomeriggio" | "Mattina" | "Sera" | "Notte" | ""
     next_step:         str                   # routing signal
     language:          str                   # language code (e.g. 'en', 'it')
 
 
 # ─── Helper: deterministic response template ─────────────────────────────────
 
-def _build_template(results: List[Dict], params: Dict) -> str:
+def _build_template(results: List[Dict], params: Dict, hour_range_label: str = "") -> str:
     """Build the structured, emoji-rich part of the response deterministically."""
     if not results:
         return "⚠️ Nessun risultato disponibile."
@@ -107,6 +108,35 @@ def _build_template(results: List[Dict], params: Dict) -> str:
         return "\n".join(lines)
 
     if model_type == "yg":
+        # ── Hour-range mode: per-hour breakdown ───────────────────────────
+        if hour_range_label and results and results[0].get("eval_hour") is not None:
+            lines.append(f"🌅 *Fascia: {hour_range_label}*")
+            lines.append("")
+            lines.append("📊 *Disponibilità per fascia oraria:*")
+            lines.append("")
+
+            # Group results by hour (preserving insertion order)
+            hours_seen: list = []
+            by_hour: dict = {}
+            for r in results:
+                h = r["eval_hour"]
+                if h not in by_hour:
+                    hours_seen.append(h)
+                    by_hour[h] = []
+                by_hour[h].append(r)
+
+            for h in hours_seen:
+                lines.append(f"  🕐 *{h:02d}:00*")
+                for r in by_hour[h]:
+                    cls   = r["predicted_class"]
+                    emoji = YG_CLASS_EMOJIS.get(cls, "❓")
+                    sm    = r.get("service_mode", "")
+                    key   = f"{r['vehicle_type']}_{sm}" if sm else r["vehicle_type"]
+                    vtype = VEHICLE_TYPE_DISPLAY.get(key, r["vehicle_type"])
+                    lines.append(f"    {emoji} *{vtype}*: {r['predicted_class_name']}")
+            return "\n".join(lines)
+
+        # ── Single-hour mode ─────────────────────────────────────────────
         time_str = f"{eval_hour:02d}:{eval_minute:02d}"
         lines.append(f"🕐 Ore {time_str}")
         lines.append("")
@@ -225,23 +255,29 @@ def extractor_node(state: AgentState) -> Dict[str, Any]:
 
     # Hour-range detection for slot keywords
     hour_range: List[int] = []
+    hour_range_label: str = ""
     lmsg = last_msg.lower()
     if any(w in lmsg for w in ("pomeriggio", "afternoon")):
         hour_range = list(range(14, 19))
+        hour_range_label = "Pomeriggio"
     elif any(w in lmsg for w in ("mattina", "morning")):
         hour_range = list(range(7, 12))
+        hour_range_label = "Mattina"
     elif any(w in lmsg for w in ("sera", "evening")):
         hour_range = list(range(19, 23))
+        hour_range_label = "Sera"
     elif any(w in lmsg for w in ("notte", "night")):
         hour_range = [23, 0, 1, 2, 3]
+        hour_range_label = "Notte"
 
     if hour_range:
-        print(f"   → Hour range: {hour_range}")
+        print(f"   → Hour range: {hour_range} ({hour_range_label})")
 
     return {
         "current_params": merged,
         "candidates":     resolved.get("candidates", []),
         "hour_range":     hour_range,
+        "hour_range_label": hour_range_label,
         "next_step":      "guardrail",
     }
 
@@ -330,7 +366,18 @@ def predictor_node(state: AgentState) -> Dict[str, Any]:
 
         if hour_range:
             for h in hour_range:
-                results.append(yg.predict(location_id, h, 0, eval_dow, eval_month, "yellow", "hail"))
+                if vehicle_type == "yellow":
+                    hour_results = [yg.predict(location_id, h, 0, eval_dow, eval_month, "yellow", "hail")]
+                elif vehicle_type == "green":
+                    hour_results = [
+                        yg.predict(location_id, h, 0, eval_dow, eval_month, "green", "hail"),
+                        yg.predict(location_id, h, 0, eval_dow, eval_month, "green", "dispatch"),
+                    ]
+                else:  # "all" | None | unknown — show all YG types
+                    hour_results = yg.predict_all(location_id, h, 0, eval_dow, eval_month)
+                for r in hour_results:
+                    r["eval_hour"] = h   # tag for formatter
+                results.extend(hour_results)
         elif vehicle_type == "all" or vehicle_type is None:
             results = yg.predict_all(location_id, eval_hour, eval_minute, eval_dow, eval_month)
         elif vehicle_type == "yellow":
@@ -396,7 +443,7 @@ def formatter_node(state: AgentState) -> Dict[str, Any]:
         return {"messages": [AIMessage(content=get_msg(lang, "no_data"))]}
 
     # ── Deterministic template ────────────────────────────────────────────────
-    template = _build_template(state["results"], state.get("current_params", {}))
+    template = _build_template(state["results"], state.get("current_params", {}), state.get("hour_range_label", ""))
 
     # ── LLM insight (2-3 sentences only) ─────────────────────────────────────
     try:
@@ -471,6 +518,7 @@ class TaxiAgent:
             "validation_errors": [],
             "candidates":        [],
             "hour_range":        [],
+            "hour_range_label":  "",
             "intent":            "",
             "next_step":         "",
             "language":          lang,
