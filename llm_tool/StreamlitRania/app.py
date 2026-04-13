@@ -9,6 +9,7 @@ import pandas as pd
 from langchain_core.messages import HumanMessage, AIMessage
 
 from llm_tool.agent import get_agent
+from llm_tool.fhvhv_predictor import get_fhvhv_predictor
 
 riccardo_path = os.path.join(PROJECT_ROOT, "riccardo")
 if riccardo_path not in sys.path:
@@ -64,21 +65,41 @@ def show_nyc_map(hour=9, vehicle_type="yellow", month=3, day_of_week=2):
 
             dt = f"{base_date.date()} {hour:02d}:00:00"
 
-            result = predict_taxi_availability(
-                zone=zone_id,
-                datetime_str=dt,
-                vehicle_type=vehicle_type
-            )
-
-            mapped = mapping(result["availability_class"])
-            label = mapped["availability_label"]
-
-            if label == "alta":
-                color = [0, 200, 0, 150]
-            elif label == "media":
-                color = [255, 200, 0, 150]
+            if vehicle_type == "fhvhv":
+                predictor = get_fhvhv_predictor()
+                result = predictor.predict(
+                    location_id=zone_id,
+                    hour=hour,
+                    minute=0,
+                    day_of_week=day_of_week,
+                    month=month,
+                    is_festivo=False,
+                )
+                cls = result["predicted_class"]
+                # 0=Facile=verde, 1=Medio=giallo, 2=Difficile=rosso
+                fhvhv_colors = {
+                    0: [0, 200, 0, 150],
+                    1: [255, 200, 0, 150],
+                    2: [255, 0, 0, 150],
+                }
+                color = fhvhv_colors.get(cls, [200, 200, 200, 50])
+                label = result["predicted_class_name"]
             else:
-                color = [255, 0, 0, 150]
+                result = predict_taxi_availability(
+                    zone=zone_id,
+                    datetime_str=dt,
+                    vehicle_type=vehicle_type
+                )
+
+                mapped = mapping(result["availability_class"])
+                label = mapped["availability_label"]
+
+                if label == "alta":
+                    color = [0, 200, 0, 150]
+                elif label == "media":
+                    color = [255, 200, 0, 150]
+                else:
+                    color = [255, 0, 0, 150]
 
             props["color"] = color
             props["availability"] = label
@@ -256,13 +277,13 @@ if resp_text:
 # 🗺️ MAPPA
 st.markdown("### 🗺️ Mappa disponibilità taxi NYC")
 
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     hour = st.selectbox("Ora", list(range(24)), index=12)
 
 with col2:
-    vehicle_type = st.selectbox("Tipo taxi", ["yellow", "green"], index=0)
+    vehicle_type = st.selectbox("Tipo taxi", ["yellow", "green", "fhvhv"], index=0)
 
 with col3:
     day = st.selectbox(
@@ -270,6 +291,12 @@ with col3:
         ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"],
         index=2
     )
+
+with col4:
+    month = st.selectbox("Mese", list(range(1, 13)), index=2, format_func=lambda m: [
+        "Gen", "Feb", "Mar", "Apr", "Mag", "Giu",
+        "Lug", "Ago", "Set", "Ott", "Nov", "Dic"
+    ][m - 1])
 
 day_map = {
     "Lunedì": 0,
@@ -290,7 +317,8 @@ if st.button("🗺️ Analizza mappa"):
         st.session_state.map_deck = show_nyc_map(
             hour=hour,
             vehicle_type=vehicle_type,
-            day_of_week=day_of_week
+            day_of_week=day_of_week,
+            month=month,
         )
 
 if st.session_state.map_deck:
