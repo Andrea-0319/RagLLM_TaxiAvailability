@@ -24,7 +24,7 @@ numba>=0.59.0
 # RAG/Embeddings (optional - for enhanced search)
 # CRITICAL: must use 2.7.0 - newer versions are incompatible with transformers==4.37.2
 sentence-transformers==2.7.0
-transformers==4.37.2
+transformers>=4.41.0
 
 # UI/Visualization
 streamlit>=1.40.0
