@@ -89,6 +89,35 @@ def _build_template(results: List[Dict], params: Dict, hour_range_label: str = "
 
     model_type = r0.get("model_type", "legacy")
 
+    # ── FHVHV Hour-range mode ─────────────────────────────────────────────
+    if model_type == "fhvhv" and hour_range_label and results and results[0].get("eval_hour") is not None:
+        from .config import FHVHV_CLASS_EMOJIS
+        
+        lines.append(f"🌅 *Fascia: {hour_range_label}*")
+        lines.append("")
+        lines.append("📊 *Disponibilità per fascia oraria:*")
+        lines.append("")
+
+        hours_seen: list = []
+        by_hour: dict = {}
+        for r in results:
+            h = r["eval_hour"]
+            if h not in by_hour:
+                hours_seen.append(h)
+                by_hour[h] = []
+            by_hour[h].append(r)
+
+        for h in hours_seen:
+            lines.append(f"  🕐 *{h:02d}:00*")
+            for r in by_hour[h]:
+                wt = r.get("predicted_waiting_time", "?:??")
+                cls = r.get("predicted_class", 1)
+                emoji = FHVHV_CLASS_EMOJIS.get(cls, "❓")
+                cls_name = r.get("predicted_class_name", "Medio")
+                lines.append(f"    {emoji} *Uber/Lyft*: {cls_name} (attesa {wt})")
+        
+        return "\n".join(lines)
+
     if model_type == "fhvhv":
         time_str = f"{eval_hour:02d}:{eval_minute:02d}"
         lines.append(f"🕐 Ore {time_str}")
@@ -134,6 +163,7 @@ def _build_template(results: List[Dict], params: Dict, hour_range_label: str = "
                     key   = f"{r['vehicle_type']}_{sm}" if sm else r["vehicle_type"]
                     vtype = VEHICLE_TYPE_DISPLAY.get(key, r["vehicle_type"])
                     lines.append(f"    {emoji} *{vtype}*: {r['predicted_class_name']}")
+
             return "\n".join(lines)
 
         # ── Single-hour mode ─────────────────────────────────────────────
@@ -351,15 +381,28 @@ def predictor_node(state: AgentState) -> Dict[str, Any]:
         if vehicle_type == "fhvhv":
             fhvhv = get_fhvhv_predictor()
             is_festivo = (eval_dow == 6)
-            result = fhvhv.predict(
-                location_id=location_id,
-                hour=eval_hour,
-                minute=eval_minute,
-                day_of_week=eval_dow,
-                month=eval_month,
-                is_festivo=is_festivo,
-            )
-            results = [result]
+            if hour_range:
+                for h in hour_range:
+                    r = fhvhv.predict(
+                        location_id=location_id,
+                        hour=h,
+                        minute=0,
+                        day_of_week=eval_dow,
+                        month=eval_month,
+                        is_festivo=is_festivo,
+                    )
+                    r["eval_hour"] = h
+                    results.append(r)
+            else:
+                result = fhvhv.predict(
+                    location_id=location_id,
+                    hour=eval_hour,
+                    minute=eval_minute,
+                    day_of_week=eval_dow,
+                    month=eval_month,
+                    is_festivo=is_festivo,
+                )
+                results = [result]
             return {"results": results, "next_step": "format"}
 
         yg = get_yg_predictor()
