@@ -76,6 +76,14 @@ def _build_template(results: List[Dict], params: Dict) -> str:
     if "hourly_avg_availability" in r0:
         lines.append("📊 *Trend Storico:*")
         lines.append("I dati orari indicano l'indice di disponibilità medio da 0 (Bassa) a 1 (Alta).")
+        lines.append("")
+        for entry in r0["hourly_avg_availability"]:
+            h   = int(entry["hour"])
+            val = float(entry["availability_index"])
+            cls = 0 if val < 0.33 else (1 if val < 0.67 else 2)
+            emoji = YG_CLASS_EMOJIS.get(cls, "•")
+            label = YG_CLASS_NAMES.get(cls, "")
+            lines.append(f"  🕐 {h:02d}:00 — {emoji} {label} ({val:.2f})")
         return "\n".join(lines)
 
     model_type = r0.get("model_type", "legacy")
